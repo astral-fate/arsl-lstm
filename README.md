@@ -181,46 +181,42 @@ A significant effort was dedicated to constructing a robust dataset for ArSL rec
    * Summary Stats: Avg per class: 444, Min: 401 (dal), Max: 451 (thaa).
 
 6. **KFU Dataset:**
-   * Source: Institutional (King Faisal University)
+   * Source: Institutional (King Fahad University)
    * Size: 85,167 images.
-   * Characteristics: Significant variation in class counts.
-   * **Distribution:**
-### Combined Dataset Image Count Summary (Initial - Before Balancing/Filtering)
+   *  Total classes: 502
 
-* **Total Classes:** 39 (including placeholder/zero-count classes)
+   * **Distribution of Alpahbet:**
+
+* **Total Classes:** 39 Alpahbet
 * **Total Images:** 44,419
 
-| Class      | Count | Percentage | | Class      | Count | Percentage |
-| :--------- | ----: | :--------- | - | :--------- | ----: | :--------- |
-| aleff      |  1771 | 3.99%      | | waw        |  1441 | 3.24%      |
-| bb         |  1701 | 3.83%      | | ain        |  1441 | 3.24%      |
-| class_0061 |  1677 | 3.78%      | | seen       |  1430 | 3.22%      |
-| class_0060 |  1673 | 3.77%      | | laam       |  1429 | 3.22%      |
-| Jiim       |  1555 | 3.50%      | | raa        |  1427 | 3.21%      |
-| sheen      |  1517 | 3.42%      | | tha        |  1427 | 3.21%      |
-| haa        |  1517 | 3.42%      | | qaaf       |  1427 | 3.21%      |
-| ghayn      |  1500 | 3.38%      | | saad       |  1421 | 3.20%      |
-| ta         |  1499 | 3.37%      | | noon       |  1417 | 3.19%      |
-| haah       |  1498 | 3.37%      | | daad       |  1415 | 3.19%      |
-| zay        |  1466 | 3.30%      | | dal        |  1413 | 3.18%      |
-| faa        |  1462 | 3.29%      | | kaaf       |  1022 | 2.30%      |
-| taa        |  1459 | 3.28%      | |
-| meem       |  1458 | 3.28%      | |            |       |            |
-| zaa        |  1457 | 3.28%      | |            |       |            |
-| kha        |  1449 | 3.26%      | |            |       |            |
-| thal       |  1448 | 3.26%      | |            |       |            |
-| class_0059 |  1446 | 3.26%      | |            |       |            |
+    | Class      | Count | Percentage | | Class      | Count | Percentage |
+    | :--------- | ----: | :--------- | - | :--------- | ----: | :--------- |
+    | aleff      |  1771 | 3.99%      | | waw        |  1441 | 3.24%      |
+    | bb         |  1701 | 3.83%      | | ain        |  1441 | 3.24%      |
+    | class_0061 |  1677 | 3.78%      | | seen       |  1430 | 3.22%      |
+    | class_0060 |  1673 | 3.77%      | | laam       |  1429 | 3.22%      |
+    | Jiim       |  1555 | 3.50%      | | raa        |  1427 | 3.21%      |
+    | sheen      |  1517 | 3.42%      | | tha        |  1427 | 3.21%      |
+    | haa        |  1517 | 3.42%      | | qaaf       |  1427 | 3.21%      |
+    | ghayn      |  1500 | 3.38%      | | saad       |  1421 | 3.20%      |
+    | ta         |  1499 | 3.37%      | | noon       |  1417 | 3.19%      |
+    | haah       |  1498 | 3.37%      | | daad       |  1415 | 3.19%      |
+    | zay        |  1466 | 3.30%      | | dal        |  1413 | 3.18%      |
+    | faa        |  1462 | 3.29%      | | kaaf       |  1022 | 2.30%      |
+    | taa        |  1459 | 3.28%      | |
+    | meem       |  1458 | 3.28%      | |            |       |            |
+    | zaa        |  1457 | 3.28%      | |            |       |            |
+    | kha        |  1449 | 3.26%      | |            |       |            |
+    | thal       |  1448 | 3.26%      | |            |       |            |
+    | class_0059 |  1446 | 3.26%      | |            |       |            |
 
 
 
-7. **Kaggle RGB Arabic Alphabets Sign Language Dataset:**
-   * Source: [https://www.kaggle.com/datasets/muhammadalbrham/rgb-arabic-alphabets-sign-language-dataset?resource=download-directory](https://www.kaggle.com/datasets/muhammadalbrham/rgb-arabic-alphabets-sign-language-dataset?resource=download-directory)
-   * *Note: Detailed class distribution table not available from the provided summary pages, but contributed RGB images to the aggregation.*
 
 These diverse datasets were aggregated, leading to the initial combined dataset statistics before balancing and preprocessing.
 
-**(The rest of the section on Initial Combined Summary, Preprocessing, Final Split, Model Development, etc., follows as before)...**
-These diverse datasets were aggregated, leading to the initial combined dataset statistics.
+
 
 The initial combined dataset statistics were as follows:
 
@@ -307,7 +303,6 @@ The curated dataset was then split into training and testing sets, allocating 70
 | ya    | 4042         | 1796        | 771        |
 | zay   | 3573         | 1796        | 771        |
 
-*(Note: The Total Images column reflects the original count before balancing specifically for training/testing sets were finalized based on the 1796/771 split constraint.)*
 
 **Model Development:**
 Based on the prepared dataset, two distinct deep learning models were developed and trained using the TensorFlow/Keras framework. These models were likely based on Convolutional Neural Network (CNN) architectures, potentially exploring variations like different base networks (e.g., VGG, ResNet, MobileNet) or custom architectures tailored for sign language recognition. The training process involved feeding the training data (52,084 images) to the models, optimizing their parameters using techniques like backpropagation and gradient descent, and monitoring performance on a validation subset.
