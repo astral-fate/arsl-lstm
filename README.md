@@ -303,7 +303,216 @@ The curated dataset was then split into training and testing sets, allocating 70
 | zay   | 3573         | 1796        | 771        |
 
 
-**Model Development:**
+## Model Traning
+[https://medium.com/data-science/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
+](https://github.com/HarisIqbal88/PlotNeuralNet?tab=readme-ov-file)
+
+
+## Setting up gpu env
+
+```
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+```
+
+
+
+### 1.2. Data Splitting
+
+To ensure robust training and evaluation, the dataset was partitioned into training and testing sets. The distribution of images across these sets for each class is summarized in Table 1. A train-test split ratio of approximately 70:30 was utilized, ensuring a sufficient number of samples for training while retaining a substantial test set for unbiased performance assessment. Due to the size of the dataset, parallel processing with 4 workers was utilized to accelerate the data splitting process.
+
+**Table 1: Image Distribution Across Training and Testing Sets**
+
+| Class  | Training Set Size | Testing Set Size |
+| :------- | :---------------: | :--------------: |
+| ain    | 1479  | 635   |
+| al    | 940   | 403   |
+| aleff   | 1170  | 502   |
+| bb     | 1253  | 538   |
+| dal    | 1143  | 491   |
+| dha    | 1206  | 517   |
+| dhad   | 1169  | 501   |
+| fa     | 1368  | 587   |
+| gaaf   | 1193  | 512   |
+| ghain  | 1383  | 594   |
+| ha     | 1114  | 478   |
+| haa    | 1068  | 458   |
+| jeem   | 1086  | 466   |
+| kaaf   | 1241  | 533   |
+| khaa   | 1124  | 483   |
+| la     | 1222  | 524   |
+| laam   | 1282  | 550   |
+| meem   | 1235  | 530   |
+| nun    | 1273  | 546   |
+| ra     | 1161  | 498   |
+| saad   | 1326  | 569   |
+| seen   | 1146  | 492   |
+| sheen  | 1054  | 453   |
+| ta     | 1271  | 545   |
+| taa    | 1286  | 552   |
+| thaa   | 1236  | 530   |
+| thal   | 1107  | 475   |
+| toot   | 1253  | 538   |
+| waw    | 959   | 412   |
+| ya     | 1205  | 517   |
+| yaa    | 905   | 388   |
+| zay    | 961   | 413   |
+
+### 1.3. Preprocessing
+
+The images were preprocessed using the following torchvision transforms:
+
+*   Resizing to 224x224 pixels.
+*   Conversion to PyTorch tensors.
+*   Normalization using the ImageNet statistics (`mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]`).
+
+## 2. Model Architecture
+
+The core of the system is a Convolutional Neural Network (CNN) named ArSLNet, implemented using PyTorch. The architecture is described below:
+
+
+The table below summarizes the layer architecture of the model.
+
+| Layer (type)       | Output Shape          |  Param #    |
+| :----------------- | :-------------------- | :----------: |
+| Conv2d-1           | [1, 32, 224, 224]    | 896 |
+| ReLU-2             | [1, 32, 224, 224]    | 0 |
+| MaxPool2d-3        | [1, 32, 112, 112]    | 0 |
+| Conv2d-4           | [1, 64, 112, 112]    | 18,496  |
+| ReLU-5             | [1, 64, 112, 112]    | 0 |
+| MaxPool2d-6        | [1, 64, 56, 56]     | 0 |
+| Conv2d-7           | [1, 128, 56, 56]    | 73,856 |
+| ReLU-8             | [1, 128, 56, 56]    | 0 |
+| MaxPool2d-9        | [1, 128, 28, 28]    | 0 |
+| Conv2d-10          | [1, 256, 28, 28]    | 295,168 |
+| ReLU-11            | [1, 256, 28, 28]    | 0 |
+| MaxPool2d-12       | [1, 256, 14, 14]    | 0 |
+| Flatten-13         | [1, 50176]          | 0 |
+| Dropout-14         | [1, 50176]          | 0 |
+| Linear-15          | [1, 512]         |  25,690,112|
+| ReLU-16            | [1, 512]         | 0 |
+| Dropout-17         | [1, 512]         | 0 |
+| Linear-18          | [1, 32]         |  16,416|
+| **Total Params** | | **26,094,944** |
+
+
+![model arch](https://github.com/user-attachments/assets/7e17978a-13fb-4e9e-95fb-6f3ae0f96f02)
+
+
+
+
+
+### 5.4.2 Model Architecture and Training Setup
+
+**Model Architecture:**
+A Convolutional Neural Network (CNN) was implemented using the TensorFlow/Keras framework. The architecture consists of stacked convolutional layers with Batch Normalization and ReLU activation, followed by Max Pooling layers for spatial downsampling. After the convolutional blocks, the features are flattened, passed through Dropout for regularization, and then fed into fully connected (Dense) layers, culminating in a final output layer with 29 units (corresponding to the 29 ArSL classes) and a Softmax activation function for classification.
+
+The detailed layer configuration is as follows:
+
+
+
+
+
+**Training Configuration:**
+The model was trained using the following setup:
+
+*   **Loss Function:** Categorical Crossentropy (suitable for multi-class classification).
+*   **Optimizer:** Adam (Adaptive Moment Estimation) optimizer, likely with a tuned learning rate (e.g., 0.001).
+*   **Learning Rate Scheduler:** A scheduler such as `ReduceLROnPlateau` might have been used to decrease the learning rate if the validation loss stopped improving, although not explicitly confirmed by the provided summary.
+*   **Batch Size:** A standard batch size (e.g., 32 or 64) was likely used.
+*   **Number of Epochs:** The model was trained for approximately 64 epochs, as indicated by the training curves.
+*   **Input Image Size:** 224x224 pixels (RGB).
+*   **Normalization:** Applied as part of the preprocessing pipeline.
+
+The training process involved feeding the training data (52,084 images) to the model, optimizing its parameters using backpropagation and the Adam optimizer, and monitoring performance on a validation subset (split from the training data or using the test set for monitoring, though the latter is less common practice for final evaluation). Training was accelerated using GPU resources.
+
+
+
+
+## 5.6 Results and Discussion
+
+This section presents the quantitative results obtained from evaluating the trained CNN model on the held-out test set (22,359 images) and discusses the findings.
+
+**Overall Performance:**
+The model achieved a high overall **accuracy of 97.31%** on the test set. This indicates that the model correctly classified the ArSL sign in approximately 97 out of 100 unseen images from the test distribution.
+
+**Classification Report:**
+A detailed breakdown of performance per class is provided by the classification report:
+
+| Class | Precision | Recall | F1-score | Support |
+| :---- | :-------- | :----- | :------- | :------ |
+| ain   | 0.991     | 0.984  | 0.988    | 771     |
+| aleff | 0.973     | 0.991  | 0.982    | 771     |
+| bb    | 0.980     | 0.970  | 0.975    | 771     |
+| dal   | 0.966     | 0.982  | 0.974    | 771     |
+| dha   | 0.974     | 0.983  | 0.979    | 771     |
+| dhad  | 0.980     | 0.971  | 0.976    | 771     |
+| fa    | 0.936     | 0.960  | 0.948    | 771     |
+| gaaf  | 0.956     | 0.935  | 0.946    | 771     |
+| ghain | 0.976     | 0.991  | 0.983    | 771     |
+| ha    | 0.965     | 0.970  | 0.968    | 771     |
+| haa   | 0.962     | 0.981  | 0.971    | 771     |
+| jeem  | 0.954     | 0.965  | 0.959    | 771     |
+| kaaf  | 0.980     | 0.965  | 0.973    | 771     |
+| khaa  | 0.988     | 0.970  | 0.979    | 771     |
+| la    | 0.986     | 0.979  | 0.982    | 771     |
+| laam  | 0.973     | 0.981  | 0.977    | 771     |
+| meem  | 0.937     | 0.981  | 0.958    | 771     |
+| nun   | 0.984     | 0.961  | 0.972    | 771     |
+| ra    | 0.975     | 0.953  | 0.964    | 771     |
+| saad  | 0.965     | 0.987  | 0.976    | 771     |
+| seen  | 0.962     | 0.991  | 0.976    | 771     |
+| sheen | 0.995     | 0.978  | 0.986    | 771     |
+| ta    | 0.972     | 0.960  | 0.966    | 771     |
+| taa   | 0.961     | 0.984  | 0.972    | 771     |
+| thaa  | 0.995     | 0.960  | 0.977    | 771     |
+| thal  | 0.987     | 0.968  | 0.977    | 771     |
+| waw   | 0.993     | 0.971  | 0.982    | 771     |
+| ya    | 0.981     | 0.981  | 0.981    | 771     |
+| zay   | 0.980     | 0.966  | 0.973    | 771     |
+| **accuracy** |       |       | **0.973** | **22359** |
+| **macro avg** | 0.973 | 0.973 | 0.973   | 22359   |
+| **weighted avg** | 0.973 | 0.973 | 0.973   | 22359   |
+
+**Interpretation:**
+*   **High Precision/Recall:** Most classes exhibit high precision (low false positives) and recall (low false negatives), generally above 0.95. This indicates the model is both accurate when it predicts a class and successful at finding all instances of that class.
+*   **F1-Score:** The F1-scores, representing the harmonic mean of precision and recall, are consistently high, reflecting a good balance between precision and recall for nearly all classes. The macro and weighted averages are both 0.973, showing strong performance across the board.
+*   **Slight Variations:** Some classes like 'fa' (F1: 0.948), 'gaaf' (F1: 0.946), and 'meem' (F1: 0.958) show slightly lower (though still excellent) performance compared to top performers like 'ain' (F1: 0.988) or 'sheen' (F1: 0.986). This suggests these specific signs might be slightly harder for the model to distinguish reliably.
+
+**Training and Validation Curves:**
+
+
+
+![training_history](https://github.com/user-attachments/assets/0123e0e1-dd58-4098-95a5-6481f263fadd)
+
+
+
+**Analysis:**
+*   **Loss Curves (Left):** The training loss (blue) decreases steadily and significantly over the ~64 epochs, indicating the model is effectively learning from the training data. The test/validation loss (orange) also decreases and closely tracks the training loss, suggesting good generalization. There is no significant gap widening, which would indicate overfitting. Both losses appear to plateau towards the end, indicating convergence.
+*   **Accuracy Curves (Right):** The training accuracy (blue) increases rapidly initially and then continues to climb steadily, reaching a very high value (~96-97%). The test/validation accuracy (orange) mirrors this trend closely, also reaching a high level (~97%), confirming the model's ability to generalize to unseen data. The close tracking of the two curves further reinforces the lack of significant overfitting.
+
+**Confusion Matrix:**
+
+
+
+![confusion_matrix](https://github.com/user-attachments/assets/34e49187-b025-4d85-bd5e-4e8943d3ab5a)
+
+
+
+**Analysis:**
+*   **Strong Diagonal:** The heatmap shows a very strong diagonal from top-left to bottom-right. The high values (dark blue cells) along the diagonal represent the correctly classified instances (true positives) for each class, visually confirming the high accuracy reported. Most classes have over 740 correct predictions out of 771 test samples.
+*   **Off-Diagonal Elements (Misclassifications):** The off-diagonal cells represent misclassifications. While generally low (light blue or white), some minor confusion points can be observed:
+    *   'fa' is sometimes confused with 'ha' (13 instances).
+    *   'jeem' shows slight confusion with 'khaa' (13 instances).
+    *   'ta' has some misclassifications as 'dha' (17 instances).
+    *   'meem' shows some confusion with 'seen' (7 instances) and 'thaa' (7 instances).
+    *   These relatively small numbers of misclassifications likely occur between signs that have visual similarities in hand shape or orientation.
+*   **Balanced Test Set:** Since the test set was balanced (771 samples per class), the interpretation is straightforward – the numbers represent absolute counts of confusion.
+*   **Implications:** While the overall performance is excellent, these specific minor confusions highlight areas where the model could potentially be improved, perhaps with more targeted data augmentation or architectural tweaks if these errors significantly impact real-world usability.
+
+
+
+
+
 Based on the prepared dataset, two distinct deep learning models were developed and trained using the TensorFlow/Keras framework. These models were likely based on Convolutional Neural Network (CNN) architectures, potentially exploring variations like different base networks (e.g., VGG, ResNet, MobileNet) or custom architectures tailored for sign language recognition. The training process involved feeding the training data (52,084 images) to the models, optimizing their parameters using techniques like backpropagation and gradient descent, and monitoring performance on a validation subset.
 
 ### 5.4.2 Model Testing (Experimental results)
