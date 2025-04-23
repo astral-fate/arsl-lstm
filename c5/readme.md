@@ -1,316 +1,142 @@
 
 
-# Scientific Report: ArSL Sign Recognition using Keypoint-based Models
+## ArSLSign Language Recognition using Attention-LSTM
 
-## 1. Introduction
+This section details the architecture, training process, and performance evaluation of the Attention-LSTM model developed for Arabic Sign Language (ArSL) recognition.
 
-This report details a series of experiments aimed at recognizing Arabic Sign Language (ArSL) signs using keypoint data extracted from video frames. The core approach involves utilizing MediaPipe's pre-trained models to detect hand keypoints and then feeding this keypoint data into various neural network architectures for classification. Different strategies regarding the processing of frames (single vs. sequence), handling of multiple hands, data augmentation, selection of classes, combination of data sources, and network architectures were explored.
+**2. Model Architecture**
 
-## 2. Methodology
+The core of the system is an Attention-LSTM model, named `ArSLAttentionLSTM`, implemented using PyTorch. This model combines a pre-trained Convolutional Neural Network (CNN) for feature extraction with a Long Short-Term Memory (LSTM) network enhanced by an attention mechanism for sequence processing.
 
-The general methodology across experiments involved the following steps:
+*   **Feature Extraction (`self.feature_extractor`):**
+    *   Utilizes a pre-trained ResNet18 model.
+    *   The final two layers (average pooling and fully connected classification layer) of ResNet18 are removed to output spatial feature maps. For a standard 224x224 input, this results in a feature map of shape \[batch, 512, 7, 7].
 
-1.  **Data Loading and Filtering:** Load image data organized into class-specific folders, potentially from multiple root directories. Filter the dataset to include only a predefined subset of classes specified by SignIDs.
-2.  **Keypoint Extraction:** Process each image frame using **MediaPipe Hands** to detect **hand keypoints** (landmarks: x, y, z coordinates for 21 points per hand). Handle cases where hands are not detected or fewer than the maximum number of hands (`max_hands`) are found by padding the feature vector with zeros for consistency. The number of features extracted per frame is `num_keypoints * dimensions * max_hands`.
-3.  **Data Preparation for Model:** Depending on the experiment, either:
-    *   Use flattened keypoints from single frames directly.
-    *   Group frames from a video instance into sequences of a fixed `sequence_length`, using resampling (linspace) or padding (repeat last frame) as needed.
-    *   Calculate a representative feature vector for a sequence (e.g., mean pooling) and use this pooled vector as input.
-4.  **Data Augmentation:** Apply horizontal flipping to images during the training phase with a specified probability (`flip_prob`).
-5.  **Model Definition and Training:** Define and train a neural network model (MLP or LSTM) on the prepared keypoint data. Training involves standard backpropagation with a chosen loss function (CrossEntropyLoss, potentially with label smoothing), optimizer (AdamW), and learning rate scheduler (StepLR or ReduceLROnPlateau). Training history (loss and accuracy) and potentially validation metrics (loss and accuracy) are tracked. Checkpoints are saved, often based on the best performance metric (e.g., training or validation accuracy).
-6.  **Evaluation:** Evaluate the trained model on a separate test dataset using metrics such as accuracy, classification report (precision, recall, f1-score), and confusion matrix. Classification reports and confusion matrices are generated using the ground truth labels and the model's predictions, mapping internal integer labels back to human-readable names where possible.
+*   **Reshaping:**
+    *   The 3D feature map from the CNN \[batch, channels, height, width] is reshaped into a sequence suitable for the LSTM: \[batch, seq_len, features]. In this case, the shape becomes \[batch, 49, 512], where seq_len = 7 * 7 = 49.
 
-## 3. Dataset
+*   **Recurrent Layer (`self.lstm`):**
+    *   A 2-layer bidirectional LSTM network with a hidden size of 512 units processes the sequence of features.
+    *   Dropout (rate=0.5) is applied between LSTM layers for regularization.
 
-The experiments utilized data structured in class-specific folders within root directories (e.g., `root/class_id/instance_id/frames...`). Each instance folder contained image frames (`.jpg`, `.png`, `.jpeg`).
+*   **Attention Mechanism (`self.attention`):**
+    *   Applied to the LSTM output sequence (`lstm_out`).
+    *   Consists of two linear layers with a Tanh activation in between, producing attention weights for each position in the sequence.
+    *   A context vector is computed by taking a weighted sum of the LSTM outputs based on these attention weights.
 
-The experiments focused on different selections and combinations of the available data. The specific sets of classes used are detailed in the Appendix. The most successful experiments combined data from two root directories (`C:\Users\Fatima\Downloads\1` and `C:\Users\Fatima\Downloads\2`) for both training and testing to increase the overall data size.
+*   **Classification (`self.classifier`):**
+    *   A sequential block processes the attention context vector.
+    *   Contains two fully connected layers (1024 -> 512, 512 -> 256) with ReLU activations, Batch Normalization, and Dropout (rate=0.5) after each.
+    *   A final linear layer maps the 256 features to the number of ArSL classes (29).
 
-For sequence-based experiments, a fixed `sequence_length` (16 or 20) was enforced. If an instance had fewer frames than `sequence_length`, the sequence was padded by repeating the last frame. If it had more, frames were sampled evenly across the duration using `np.linspace`.
+**Table 1: ArSLAttentionLSTM Layer Summary**
 
-Horizontal flip augmentation with a probability of 0.5 was applied during training in experiments configured to do so.
+| Layer (type)      | Output Shape     | Param #      |
+| :---------------- | :--------------- | :----------- |
+| ResNet18          | \[1, 512, 7, 7]  | 11,176,512   |
+| LSTM              | \[1, 49, 1024]   | 10,502,144   |
+| Attention         | \[1, 49, 1]    | 262,657      |
+| Linear-1          | \[1, 512]        | 524,800      |
+| ReLU-1            | \[1, 512]        | 0            |
+| BatchNorm1d-1     | \[1, 512]        | 1,024        |
+| Dropout-1         | \[1, 512]        | 0            |
+| Linear-2          | \[1, 256]        | 131,328      |
+| ReLU-2            | \[1, 256]        | 0            |
+| BatchNorm1d-2     | \[1, 256]        | 512          |
+| Dropout-2         | \[1, 256]        | 0            |
+| Linear-3 (Output) | \[1, 29]         | 7,453        |
+| **Total params:** |                  | **22,606,430** |
+| Trainable params: |                  | 22,606,430   |
+| Non-trainable params: |              | 0            |
 
-## 4. Model Architectures
+**3. Training Details**
 
-Four distinct model classes were defined and used:
+The model was trained under the following settings:
 
-1.  **`KeypointMLP` (Used in Exp 1):**
-    *   A simple Multi-Layer Perceptron for single-frame classification.
-    *   Input: Flattened keypoints from a single frame (`(batch_size, num_features)`).
-    *   Architecture: Two hidden layers with ReLU activation, BatchNorm, and Dropout, followed by an output linear layer.
+*   **Device:** CUDA (if available), otherwise CPU.
+*   **Loss Function:** CrossEntropyLoss with class weights to handle potential data imbalance.
+*   **Optimizer:** AdamW (learning rate = 0.001, weight decay = 1e-4).
+*   **Learning Rate Scheduler:** OneCycleLR (max_lr=0.001, epochs=60, pct_start=0.1).
+*   **Batch Size:** 32.
+*   **Number of Epochs:** 64.
+*   **Input Image Size:** 224x224.
+*   **Normalization:** Images were normalized using standard ImageNet `transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])`.
+*   **Augmentation:** RandomResizedCrop, RandomHorizontalFlip, RandomRotation, ColorJitter, RandomAffine were used during training.
+*   **Regularization:** Dropout (rate=0.5) in LSTM and classifier, Weight Decay in optimizer, Gradient Clipping (max_norm=1.0).
 
-2.  **`KeypointMLP_v2` (Used in Exp 3, 8):**
-    *   An improved MLP with higher capacity (more units and an additional hidden layer), designed for flattened keypoints.
-    *   Input: Flattened keypoints from a single frame (`(batch_size, num_features)`) for Exp 3, or *mean-pooled* sequence features (`(batch_size, num_features_per_frame)`) for Exp 8.
-    *   Architecture: Three hidden layers with ReLU activation, BatchNorm, and Dropout, followed by an output linear layer.
+**4. Results and Evaluation**
 
-3.  **`KeypointLSTM` (Used in Exp 2, 4, 6, 9):**
-    *   A standard LSTM model designed to process sequences of keypoint frames.
-    *   Input: Sequence of keypoint frames (`(batch_size, seq_len, input_features)`). In Exp 2, `seq_len` was effectively 1.
-    *   Architecture: A multi-layer, bidirectional LSTM, followed by a two-layer classifier on the output of the *last time step*.
+The Attention-LSTM model achieved a **Test Accuracy of 98.46%** with a Test Loss of 0.1075. The following metrics provide a detailed evaluation:
 
-4.  **`KeypointLSTM_Simple` (Attempted in Exp 5):**
-    *   A simplified version of the `KeypointLSTM`.
-    *   Input: Sequence of keypoint frames (`(batch_size, seq_len, input_features)`).
-    *   Architecture: A single-layer, unidirectional LSTM, followed by a simple one-layer classifier on the output of the *last time step*.
+**Classification Report**
+Table 2 presents the precision, recall, and F1-score for each of the 29 ArSL classes on the test set.
 
-## 5. Experiments and Results
+**Table 2: Classification Report (Attention-LSTM)**
 
-This section details the successful experiments based on the provided code and logs.
+| Class     | Precision | Recall   | F1-score | Support   |
+| :-------- | :-------- | :------- | :------- | :-------- |
+| ain       | 0.989717  | 0.998703 | 0.994190 | 771.00000 |
+| aleff     | 0.993515  | 0.993515 | 0.993515 | 771.00000 |
+| bb        | 0.990838  | 0.981842 | 0.986319 | 771.00000 |
+| dal       | 0.973180  | 0.988327 | 0.980695 | 771.00000 |
+| dha       | 0.981865  | 0.983139 | 0.982502 | 771.00000 |
+| dhad      | 0.978177  | 0.988327 | 0.983226 | 771.00000 |
+| fa        | 0.966581  | 0.975357 | 0.970949 | 771.00000 |
+| gaaf      | 0.974026  | 0.972763 | 0.973394 | 771.00000 |
+| ghain     | 0.996084  | 0.989624 | 0.992843 | 771.00000 |
+| ha        | 0.988266  | 0.983139 | 0.985696 | 771.00000 |
+| haa       | 0.981842  | 0.981842 | 0.981842 | 771.00000 |
+| jeem      | 0.983139  | 0.983139 | 0.983139 | 771.00000 |
+| kaaf      | 0.994695  | 0.972763 | 0.983607 | 771.00000 |
+| khaa      | 0.979355  | 0.984436 | 0.981889 | 771.00000 |
+| la        | 0.997368  | 0.983139 | 0.990202 | 771.00000 |
+| laam      | 0.968434  | 0.994812 | 0.981446 | 771.00000 |
+| meem      | 0.980645  | 0.985733 | 0.983182 | 771.00000 |
+| nun       | 0.993395  | 0.975357 | 0.984293 | 771.00000 |
+| ra        | 0.993307  | 0.962387 | 0.977602 | 771.00000 |
+| saad      | 0.980843  | 0.996109 | 0.988417 | 771.00000 |
+| seen      | 0.971033  | 1.000000 | 0.985304 | 771.00000 |
+| sheen     | 0.998698  | 0.994812 | 0.996751 | 771.00000 |
+| ta        | 0.976654  | 0.976654 | 0.976654 | 771.00000 |
+| taa       | 0.997361  | 0.980545 | 0.988882 | 771.00000 |
+| thaa      | 0.985696  | 0.983139 | 0.984416 | 771.00000 |
+| thal      | 0.986979  | 0.983139 | 0.985055 | 771.00000 |
+| waw       | 0.993447  | 0.983139 | 0.988266 | 771.00000 |
+| ya        | 0.975858  | 0.996109 | 0.985879 | 771.00000 |
+| zay       | 0.984375  | 0.980545 | 0.982456 | 771.00000 |
+| accuracy  |           |          | 0.984570 | 0.98457   |
+| macro avg | 0.984668  | 0.984570 | 0.984573 | 22359.00000 |
+| weighted avg| 0.984668  | 0.984570 | 0.984573 | 22359.00000 |
 
-### Experiment 1: Basic MLP (Single Frame, 1 Hand)
+**Confusion Matrix Analysis for Attention-LSTM Performance**
+The confusion matrix (Figure 1) provides a granular view of the Attention-LSTM model's classification performance across all 29 ArSL classes on the test data.
 
-*   **Source Files:** `VER 1.txt`
-*   **Data:** Single root data (Wordstrain/Wordtest). 23 classes (Set 1, English names from log). 1 hand. Single frame input (63 features). No augmentation.
-*   **Model:** `KeypointMLP` (63 input features).
-*   **Training:** 64 epochs. Batch Size: 64. Loss: CrossEntropyLoss. Optimizer: AdamW (lr=0.001, weight_decay=1e-4). Scheduler: StepLR (step=20, gamma=0.1). Saved best model based on training accuracy.
-*   **Results:**
-    *   Best Training Accuracy: 75.62%
-    *   Test Loss: 0.5502
-    *   Test Accuracy: 82.65%
-    *   Classification Report saved as `keypoint_classification_report.csv`. Confusion Matrix saved as `keypoint_model_confusion_matrix.png`. The report is included in the Summary Table below.
+*   **Dominant Diagonal:** The heatmap clearly shows strong values along the main diagonal, indicating high numbers of correct predictions for nearly all classes. Many classes show over 740 correct predictions out of 771 samples, visually confirming the high overall test accuracy of 98.46%.
 
-### Experiment 2: LSTM (Single Frame as Seq=1, 2 Hands)
+*   **Class-Specific Misclassifications:** Examining the off-diagonal elements reveals specific instances where the model experiences confusion:
+    *   The most frequent misclassification is the true class 'kaaf' being predicted as 'seen' (17 instances).
+    *   Other notable confusions include 'dha' predicted as 'ta' (11 instances) and 'gaaf' predicted as 'fa' (11 instances).
+    *   These minor confusions might stem from visual similarities in handshapes or movements between these specific sign pairs.
 
-*   **Source Files:** `VER 2.txt`
-*   **Data:** Single root data (Wordstrain/Wordtest). 23 classes (Set 1). 2 hands. Single frame input treated as sequence length 1 (126 features/frame). No augmentation.
-*   **Model:** `KeypointLSTM` (126 input features/frame, hidden=256, layers=2, bidirectional=True).
-*   **Training:** 70 epochs. Batch Size: 64. Loss: CrossEntropyLoss. Optimizer: AdamW (lr=5e-4, weight_decay=1e-4). Scheduler: StepLR (step=15, gamma=0.2). Saved best model based on training accuracy.
-*   **Results:**
-    *   Best Training Accuracy: 74.65%
-    *   Test Loss: 0.6975
-    *   Test Accuracy: 77.32%
-    *   Classification Report saved as `keypoint_lstm_classification_report.csv`. Confusion Matrix saved as `keypoint_lstm_model_confusion_matrix.png`. The report is included in the Summary Table below.
+*   **Support Balance:** The dataset appears well-balanced, with each class having 771 instances in the test set. This allows for a direct comparison of misclassification counts across classes without significant bias from varying sample sizes.
 
-### Experiment 3: Improved MLP v2 (Single Frame, 2 Hands, Augmentation)
+*   **Potential Impact:** Despite the very high accuracy, the few misclassifications highlighted by the confusion matrix are important. In a real-time sign language translation system, confusing signs like 'kaaf' and 'seen' could lead to misunderstandings. This underscores the value of analyzing these specific errors for potential targeted model improvements or data augmentation strategies.
 
-*   **Source Files:** `VER 3.txt`
-*   **Data:** Single root data (Wordstrain/Wordtest). 23 classes (Set 1). 2 hands. Single frame input (126 features). Horizontal flip augmentation.
-*   **Model:** `KeypointMLP_v2` (126 input features, hidden1=512, hidden2=256, hidden3=128).
-*   **Training:** 80 epochs. Batch Size: 128. Loss: CrossEntropyLoss. Optimizer: AdamW (lr=0.001, weight_decay=1e-5). Scheduler: StepLR (step=25, gamma=0.1). Saved best model based on training accuracy.
-*   **Results:**
-    *   Best Training Accuracy: 72.59%
-    *   Test Loss: 0.6124
-    *   Test Accuracy: 80.26%
-    *   Classification Report saved as `keypoint_mlp_v2_aug_classification_report.csv`. Confusion Matrix saved as `keypoint_mlp_v2_aug_model_confusion_matrix.png`. The report is included in the Summary Table below.
-
-### Experiment 4: LSTM (Sequence, 2 Hands, Aug, Filtered Classes, Small Data)
-
-*   **Source Files:** `VER 4.txt`
-*   **Data:** Single root data (`C:\Users\Fatima\Downloads\1`). 23 specific classes (Set 2). 2 hands. Sequence length 16 (126 features/frame). Horizontal flip augmentation. Train samples: 970, Test samples: 184 (8/class).
-*   **Model:** `KeypointLSTM` (126 input features/frame, hidden=256, layers=2, bidirectional=True).
-*   **Training:** 120 epochs. Batch Size: 32. Loss: CrossEntropyLoss(label_smoothing=0.1). Optimizer: AdamW (lr=5e-4, weight_decay=1e-4). Scheduler: ReduceLROnPlateau (patience=10, factor=0.2), stepped on training loss. Saved best model based on training accuracy.
-*   **Results:**
-    *   Best Training Accuracy: 99.90%
-    *   Test Loss: 2.0979
-    *   Test Accuracy: 54.89%
-    *   Classification Report saved as `keypoint_lstm_seq_filtered_classification_report.csv`. Confusion Matrix saved as `keypoint_lstm_seq_filtered_model_confusion_matrix.png`. The report is included in the Summary Table below. (Note: Low test accuracy likely due to very small test set).
-
-### Experiment 6: LSTM (Sequence, 2 Hands, Aug, Filtered Classes, Combined Data)
-
-*   **Source Files:** `VER 6.txt`
-*   **Data:** Combined root data (`C:\Users\Fatima\Downloads\1`, `C:\Users\Fatima\Downloads\2`). 23 specific classes (Set 2). 2 hands. Sequence length 16 (126 features/frame). Horizontal flip augmentation. Train samples: 1940, Test samples: 368 (16/class).
-*   **Model:** `KeypointLSTM` (126 input features/frame, hidden=256, layers=2, bidirectional=True).
-*   **Training:** 120 epochs. Batch Size: 32. Loss: CrossEntropyLoss(label_smoothing=0.1). Optimizer: AdamW (lr=5e-4, weight_decay=1e-4). Scheduler: ReduceLROnPlateau (patience=10, factor=0.2), stepped on training loss. Saved best model based on training accuracy.
-*   **Results:**
-    *   Best Training Accuracy: 99.95%
-    *   Test Loss: 0.7623
-    *   Test Accuracy: 96.74%
-    *   Classification Report saved as `keypoint_lstm_seq_combined_classification_report.csv`. Confusion Matrix saved as `keypoint_lstm_seq_combined_model_confusion_matrix.png`. The report is included in the Summary Table below.
-
-### Experiment 8: MLP v2 Pooled (Sequence, 2 Hands, Aug, Different Filtered Classes, Combined Data, Train/Val Split)
-
-*   **Source Files:** `MLP DIFFRENT LABELS.txt` and `VER 8.txt` (Code likely in VER 8, log is the first block).
-*   **Data:** Combined root data (`C:\Users\Fatima\Downloads\1`, `C:\Users\Fatima\Downloads\2`). 23 specific classes (Set 3). 2 hands. Sequence length 16 (126 features/frame), mean-pooled. Horizontal flip augmentation. Train samples: 1645 (split from 1935), Val samples: 290, Test samples: 368 (16/class).
-*   **Model:** `KeypointMLP_v2` (126 input features, hidden1=512, hidden2=256, hidden3=128).
-*   **Training:** 80 epochs. Batch Size: 128. Loss: CrossEntropyLoss(label_smoothing=0.1). Optimizer: AdamW (lr=0.001, weight_decay=1e-5). Scheduler: ReduceLROnPlateau (patience=10, factor=0.2), stepped on validation loss. Saved best model based on validation accuracy.
-*   **Results:**
-    *   Best Validation Accuracy: 95.86%
-    *   Test Loss: 0.9745
-    *   Test Accuracy: 88.86%
-    *   Classification Report saved as `keypoint_mlp_pooled_labeled_classification_report.csv`. Confusion Matrix saved as `keypoint_mlp_pooled_labeled_model_confusion_matrix.png`. The report is included in the Summary Table below.
-
-### Experiment 9: LSTM (Sequence, 2 Hands, Aug, *Specific* Filtered Classes, Combined Data, Resumable)
-
-*   **Source Files:** Modified `VER 6.txt` (code provided with the request).
-*   **Data:** Combined root data (`C:\Users\Fatima\Downloads\1`, `C:\Users\Fatima\Downloads\2`). **17 specific classes** (Set 4, detailed in Appendix). 2 hands. Sequence length 16 (126 features/frame). Horizontal flip augmentation. Test samples: 17 classes * 16 samples/class = 272. (Train samples size not explicitly logged in the provided snippet, but based on dataset logic it would be the sum of instances of these 17 classes across the train roots).
-*   **Model:** `KeypointLSTM` (126 input features/frame, hidden=256, layers=2, bidirectional=True, dropout=0.5). Includes resume training logic.
-*   **Training:** 120 epochs (total target). Batch Size: 32. Loss: CrossEntropyLoss(label_smoothing=0.1). Optimizer: AdamW (lr=5e-4, weight_decay=1e-4). Scheduler: ReduceLROnPlateau (patience=10, factor=0.2), stepped on training loss. Saved best model based on training accuracy. Resumed training was attempted.
-*   **Results:**
-    *   Test Loss: 0.7066
-    *   Test Accuracy: 96.69%
-    *   Classification Report is provided below. Confusion Matrix was likely saved as `keypoint_lstm_seq_combined_model_confusion_matrix.png` (name from code).
-
-    **Classification Report (Test Set, using folder names from Set 4):**
-    ```
-                  precision    recall  f1-score     support
-    0162           1.000000  0.500000  0.666667   16.000000
-    0163           1.000000  1.000000  1.000000   16.000000
-    0165           0.833333  0.937500  0.882353   16.000000
-    0167           1.000000  1.000000  1.000000   16.000000
-    0173           1.000000  1.000000  1.000000   16.000000
-    0174           0.941176  1.000000  0.969697   16.000000
-    0181           1.000000  1.000000  1.000000   16.000000
-    0183           1.000000  1.000000  1.000000   16.000000
-    0184           1.000000  1.000000  1.000000   16.000000
-    0186           0.888889  1.000000  0.941176   16.000000
-    0224           1.000000  1.000000  1.000000   16.000000
-    0234           1.000000  1.000000  1.000000   16.000000
-    0235           1.000000  1.000000  1.000000   16.000000
-    0272           1.000000  1.000000  1.000000   16.000000
-    0285           0.888889  1.000000  0.941176   16.000000
-    0286           1.000000  1.000000  1.000000   16.000000
-    0290           0.941176  1.000000  0.969697   16.000000
-    accuracy       0.966912  0.966912  0.966912    0.966912
-    macro avg      0.970204  0.966912  0.962986  272.000000
-    weighted avg   0.970204  0.966912  0.962986  272.000000
-    ```
-
-### Failed Experiments
-
-*   **Experiment 5 (VER 5.txt): Simple LSTM (Sequence, 2 Hands, Aug, Filtered Classes, Increased Seq Len)**
-    *   This experiment aimed to use the `KeypointLSTM_Simple` model with sequence length 20 on Set 2 classes. The provided log shows a `SyntaxError` in the `ArSLSequenceKeypointDataset` (`kpts=[]; try: ...`). This experiment did not complete successfully.
-*   **Experiment 7 (VER 7.txt): MLP Pooled (Sequence, 2 Hands, Augmentation, Filtered Classes)**
-    *   This experiment aimed to use the `KeypointMLP_v2` model with mean-pooled sequences on Set 2 classes, trained on combined data. The provided log shows a `SyntaxError` in the `_extract_keypoints_from_image` method (`kpts=[]; try: ...`), similar to Exp 5. This experiment did not complete successfully.
-
-## 6. Summary of Results
-
-Comparing the test accuracies of the successful experiments:
-
-| Experiment # | Model Type        | Frame Handling      | Hands | Augmentation | Data Source    | Train Samples | Test Samples | Val Split | Classes Used | Test Accuracy |
-| :----------- | :---------------- | :------------------ | :---- | :----------- | :------------- | :------------ | :----------- | :-------- | :----------- | :------------ |
-| 1 (VER 1)    | `KeypointMLP`     | Single Frame        | 1     | No           | Single Root    | 12282         | 5290         | No        | Set 1        | 82.65%        |
-| 2 (VER 2)    | `KeypointLSTM`    | Single Frame (Seq=1)| 2     | No           | Single Root    | 12282         | 5290         | No        | Set 1        | 77.32%        |
-| 3 (VER 3)    | `KeypointMLP_v2`  | Single Frame        | 2     | Yes (Flip)   | Single Root    | 12282         | 5290         | No        | Set 1        | 80.26%        |
-| 4 (VER 4)    | `KeypointLSTM`    | Sequence (16)       | 2     | Yes (Flip)   | Single Root (1)| 970           | 184          | No        | Set 2        | 54.89%        |
-| 6 (VER 6)    | `KeypointLSTM`    | Sequence (16)       | 2     | Yes (Flip)   | Combined Roots | 1940          | 368          | No        | Set 2        | **96.74%**    |
-| 8 (MLP Pooled)| `KeypointMLP_v2`  | Pooled Seq (16)     | 2     | Yes (Flip)   | Combined Roots | 1645 (Train)  | 368          | Yes (290) | Set 3        | 88.86%        |
-| 9 (New Log)  | `KeypointLSTM`    | Sequence (16)       | 2     | Yes (Flip)   | Combined Roots | ~1300*        | 272          | No        | Set 4        | 96.69%        |
-
-*~1300 train samples for Exp 9 is an estimate based on 17 classes * approx 42 instances/class from combined roots.
-
-The results consistently show that using sequences (`KeypointLSTM`) and training on a larger dataset (combined roots) leads to significantly higher accuracy compared to single-frame models or models trained on limited data, confirming the importance of temporal information and data volume. The `KeypointLSTM` architecture with its ability to process sequences appears more suitable for this task than an MLP even with pooled sequence features.
-
-## 7. Discussion and Future Work
-
-... (Keep the Discussion and Future Work section as written previously, as the conclusions drawn from Exp 6 still hold and are reinforced by Exp 9's similar high performance on a different class set).
-
-## 8. Appendix: Data Labels
-
-The experiments used different sets of classes filtered by SignID. The specific mapping from folder name (SignID as a 4-digit string) to English label is provided below for the sets used in successful experiments where this mapping was explicitly defined in the code. The SignID corresponds to the number, Arabic, and English columns in the `KARSL-502_Labels.xlsx` file.
-
-**Classes Used in Experiments 4 and 6 (LSTM Sequence, Filtered Classes):**
-
-These are 23 classes filtered by `SIGN_IDS_TO_USE = [160, 161, ..., 293]`.
-
-| SignID | Sign-English  |
-| :----- | :------------ |
-| 0160   | eat           |
-| 0161   | drink         |
-| 0162   | sleep         |
-| 0163   | wake up       |
-| 0164   | hear          |
-| 0173   | walk          |
-| 0174   | love          |
-| 0175   | hate          |
-| 0195   | father        |
-| 0196   | mother        |
-| 0197   | sister        |
-| 0198   | brother       |
-| 0199   | girl          |
-| 0202   | man           |
-| 0203   | young man     |
-| 0204   | young woman   |
-| 0234   | confused      |
-| 0235   | worried       |
-| 0238   | happy         |
-| 0289   | welcome       |
-| 0290   | greeting      |
-| 0291   | here you are  |
-| 0293   | thanks        |
-
-**Classes Used in Experiment 8 (MLP Pooled, Combined Data, Train/Val Split):**
-
-These are 23 classes filtered by `SIGNID_TO_LABEL_EN` which maps to `SIGN_IDS_TO_USE = [162, 163, ..., 293]`.
-
-| SignID | Sign-English |
-| :----- | :----------- |
-| 0162   | sleep        |
-| 0163   | wake up      |
-| 0164   | hear         |
-| 0165   | silence      |
-| 0167   | rise         |
-| 0173   | walk         |
-| 0174   | love         |
-| 0175   | hate         |
-| 0181   | think        |
-| 0183   | smoke        |
-| 0184   | support      |
-| 186    | call         |
-| 0224   | beautiful    |
-| 0234   | confused     |
-| 0235   | worried      |
-| 0238   | happy        |
-| 0239   | sad          |
-| 0256   | crying       |
-| 0272   | intelligent  |
-| 0285   | here         |
-| 286    | there        |
-| 290    | greeting     |
-| 293    | thanks       |
-
-**Classes Used in Experiment 9 (LSTM Sequence, Combined Data, Specific Filtered Classes):**
-
-These are the **17 classes** filtered by `SIGN_IDS_TO_USE = [162, 163, ..., 290]` from the code snippet provided with the results.
-
-| SignID | Sign-English |
-| :----- | :----------- |
-| 0162   | sleep        |
-| 0163   | wake up      |
-| 0165   | silence      |
-| 0167   | rise         |
-| 0173   | walk         |
-| 0174   | love         |
-| 0181   | think        |
-| 0183   | smoke        |
-| 0184   | support      |
-| 0186   | call         |
-| 0224   | beautiful    |
-| 0234   | confused     |
-| 0235   | worried      |
-| 0272   | intelligent  |
-| 0285   | here         |
-| 0286   | there        |
-| 0290   | greeting     |
-
-**Classes Used in Experiments 1, 2, and 3 (MLP/LSTM Single Frame, Unfiltered Data):**
-
-These experiments used classes corresponding to the folder names found directly in `C:/Users/Fatima/Downloads/Wordstrain` and `C:/Users/Fatima/Downloads/Wordtest`. Based on the log outputs and common English translations, these appear to be:
-
-| Folder Name   | Possible English Label |
-| :------------ | :--------------------- |
-| brother       | brother                |
-| confused      | confused               |
-| drink         | drink                  |
-| eat           | eat                    |
-| father        | father                 |
-| girl          | girl                   |
-| greeting      | greeting               |
-| happy         | happy                  |
-| hate          | hate                   |
-| hear          | hear                   |
-| here you are  | here you are           |
-| love          | love                   |
-| man           | man                    |
-| mother        | mother                 |
-| sister        | sister                 |
-| sleep         | sleep                  |
-| thanks        | thanks                 |
-| wake up       | wake up                |
-| walk          | walk                   |
-| welcome       | welcome                |
-| worried       | worried                |
-| young man     | young man              |
-| young woman   | young woman            |
+![confusion_matrix](https://github.com/user-attachments/assets/eddd9513-8873-4c0f-a2f1-5fba8f49eb40)
 
 
+*Figure 1: Confusion Matrix of Attention-LSTM on the test dataset. Axes represent true and predicted labels, and the heatmap illustrates the frequency of classifications.*
+
+**Loss and Accuracy Curves**
+Figure 2 displays the training loss and accuracy curves over the 64 epochs.
+
+*   **Loss Curves:** The training loss decreased steadily throughout training, reaching a very low value (around 0.02), indicating the model learned the training data effectively. The final test loss was 0.1075.
+*   **Accuracy Curves:** Training accuracy rapidly increased and plateaued at a very high level (above 99.5%). The final test accuracy reached 98.46%.
+*   **Interpretation:** The curves demonstrate successful training convergence. The small gap between the final training accuracy (99.57%) and test accuracy (98.46%) suggests good generalization performance with minimal overfitting. The model learned the underlying patterns effectively and applied them well to unseen data.
+
+![improved_training_history](https://github.com/user-attachments/assets/e7bab395-6a85-4b95-8db3-165fc80181fe)
+
+
+*Figure 2: Training Loss and Accuracy Curves for the Attention-LSTM model.*
+
+---
