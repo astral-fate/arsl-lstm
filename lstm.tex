@@ -1,0 +1,167 @@
+\documentclass[border=15pt, multi, tikz]{standalone}
+\usepackage{import}
+\subimport{./layers/}{init}
+\usetikzlibrary{positioning}
+\usetikzlibrary{3d}
+
+\def\ConvColor{rgb:yellow,5;red,2.5;white,5}
+\def\ConvReluColor{rgb:yellow,5;red,5;white,5}
+\def\PoolColor{rgb:red,1;black,0.3}
+\def\BatchNormColor{rgb:green,5;black,0.3}
+\def\LSTMColor{rgb:blue,5;red,2.5;white,5}
+\def\AttentionColor{rgb:magenta,5;blue,2.5;white,5}
+\def\LinearColor{rgb:blue,5;white,5}
+\def\DropoutColor{rgb:gray,5;black,0.3}
+
+\begin{document}
+\begin{tikzpicture}
+\tikzstyle{connection}=[ultra thick,every node/.style={sloped,allow upside down},draw=\edgecolor,opacity=0.7]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Draw Layer Blocks - Feature Extractor (ResNet18)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Input Image
+\pic[shift={(0,0,0)}] at (0,0,0) {Box={name=input,caption=Input Image,
+        xlabel={{"3"}},zlabel=224,fill=\ConvColor,
+        height=40,width=1,depth=40}};
+
+% Initial Conv + BN + ReLU + MaxPool
+\pic[shift={(2,0,0)}] at (input-east) {RightBandedBox={name=conv1,caption=Conv1,
+        xlabel={{"64"}},zlabel=112,fill=\ConvColor,bandfill=\ConvReluColor,
+        height=35,width=2,depth=35}};
+
+\pic[shift={(0,0,0)}] at (conv1-east) {Box={name=bn1,caption=BN1,
+        fill=\BatchNormColor,opacity=0.5,height=35,width=1,depth=35}};
+
+\pic[shift={(0,0,0)}] at (bn1-east) {Box={name=pool1,caption=MaxPool,
+        fill=\PoolColor,opacity=0.5,height=30,width=1,depth=30}};
+
+% ResNet Layer 1 (64 -> 64)
+\pic[shift={(2,0,0)}] at (pool1-east) {RightBandedBox={name=res1,caption=ResBlock1,
+        xlabel={{"64"}},zlabel=56,fill=\ConvColor,bandfill=\ConvReluColor,
+        height=30,width=3,depth=30}};
+
+% ResNet Layer 2 (64 -> 128)
+\pic[shift={(2,0,0)}] at (res1-east) {RightBandedBox={name=res2,caption=ResBlock2,
+        xlabel={{"128"}},zlabel=28,fill=\ConvColor,bandfill=\ConvReluColor,
+        height=25,width=3,depth=25}};
+
+% ResNet Layer 3 (128 -> 256)
+\pic[shift={(2,0,0)}] at (res2-east) {RightBandedBox={name=res3,caption=ResBlock3,
+        xlabel={{"256"}},zlabel=14,fill=\ConvColor,bandfill=\ConvReluColor,
+        height=20,width=3,depth=20}};
+
+% ResNet Layer 4 (256 -> 512)
+\pic[shift={(2,0,0)}] at (res3-east) {RightBandedBox={name=res4,caption=ResBlock4,
+        xlabel={{"512"}},zlabel=7,fill=\ConvColor,bandfill=\ConvReluColor,
+        height=15,width=3,depth=15}};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Reshape operation - from CNN to LSTM
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pic[shift={(2,0,0)}] at (res4-east) {Box={name=reshape,caption=Reshape,
+        xlabel={{"49,512"}},fill=\BatchNormColor,opacity=0.5,height=15,width=2,depth=15}};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% LSTM and Attention Layers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% LSTM Layers
+\pic[shift={(2,0,0)}] at (reshape-east) {RightBandedBox={name=lstm,caption=BiLSTM Layers,
+        xlabel={{"1024"}},fill=\LSTMColor,bandfill=\LSTMColor,
+        height=15,width=3,depth=15}};
+
+% Attention Mechanism
+\pic[shift={(2,0,0)}] at (lstm-east) {RightBandedBox={name=attention,caption=Attention,
+        xlabel={{"1"}},fill=\AttentionColor,bandfill=\AttentionColor,
+        height=15,width=2,depth=15}};
+
+% Context Vector
+\pic[shift={(2,0,0)}] at (attention-east) {Box={name=context,caption=Context Vector,
+        xlabel={{"1024"}},fill=\AttentionColor,opacity=0.7,height=15,width=1,depth=15}};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Classifier Layers - FIXED SPACING TO AVOID OVERLAP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Dropout before classifier
+\pic[shift={(2,0,0)}] at (context-east) {Box={name=dropout1,caption=Dropout,
+        fill=\DropoutColor,opacity=0.5,height=15,width=1,depth=15}};
+
+% Linear 1
+\pic[shift={(2,0,0)}] at (dropout1-east) {Box={name=linear1,caption=Linear1,
+        xlabel={{"512"}},zlabel={{}},fill=\LinearColor,
+        height=12,width=1.5,depth=12}};
+
+% BatchNorm1 - Added some horizontal space
+\pic[shift={(1.5,0,0)}] at (linear1-east) {Box={name=bn2,caption=BtchNor,
+        zlabel={{}},fill=\BatchNormColor,opacity=0.5,height=12,width=1,depth=12}};
+
+% Dropout - Added some horizontal space
+\pic[shift={(1.5,0,0)}] at (bn2-east) {Box={name=dropout2,caption=Dropout,
+        zlabel={{}},fill=\DropoutColor,opacity=0.5,height=12,width=1,depth=12}};
+
+% Linear 2 - Added more horizontal space
+\pic[shift={(2,0,0)}] at (dropout2-east) {Box={name=linear2,caption=Linear2,
+        xlabel={{"256"}},zlabel={{}},fill=\LinearColor,
+        height=10,width=1.5,depth=10}};
+
+% BatchNorm2 - Added some horizontal space
+\pic[shift={(1.5,0,0)}] at (linear2-east) {Box={name=bn3,caption=BtchNor,
+        zlabel={{}},fill=\BatchNormColor,opacity=0.5,height=10,width=1,depth=10}};
+
+% Dropout - Added some horizontal space
+\pic[shift={(1.5,0,0)}] at (bn3-east) {Box={name=dropout3,caption=Dropout,
+        zlabel={{}},fill=\DropoutColor,opacity=0.5,height=10,width=1,depth=10}};
+
+% Output layer
+\pic[shift={(2,0,0)}] at (dropout3-east) {Box={name=output,caption=Output,
+        xlabel={{"29"}},fill=\LinearColor,
+        height=8,width=2,depth=8}};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Draw connections
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Feature extractor connections
+\draw [connection]  (input-east)    -- node {\midarrow} (conv1-west);
+\draw [connection]  (conv1-east)    -- node {\midarrow} (bn1-west);
+\draw [connection]  (bn1-east)      -- node {\midarrow} (pool1-west);
+\draw [connection]  (pool1-east)    -- node {\midarrow} (res1-west);
+\draw [connection]  (res1-east)     -- node {\midarrow} (res2-west);
+\draw [connection]  (res2-east)     -- node {\midarrow} (res3-west);
+\draw [connection]  (res3-east)     -- node {\midarrow} (res4-west);
+
+% Reshape and LSTM connections
+\draw [connection]  (res4-east)     -- node {\midarrow} (reshape-west);
+\draw [connection]  (reshape-east)  -- node {\midarrow} (lstm-west);
+\draw [connection]  (lstm-east)     -- node {\midarrow} (attention-west);
+\draw [connection]  (attention-east) -- node {\midarrow} (context-west);
+
+% Classifier connections
+\draw [connection]  (context-east)  -- node {\midarrow} (dropout1-west);
+\draw [connection]  (dropout1-east) -- node {\midarrow} (linear1-west);
+\draw [connection]  (linear1-east)  -- node {\midarrow} (bn2-west);
+\draw [connection]  (bn2-east)      -- node {\midarrow} (dropout2-west);
+\draw [connection]  (dropout2-east) -- node {\midarrow} (linear2-west);
+\draw [connection]  (linear2-east)  -- node {\midarrow} (bn3-west);
+\draw [connection]  (bn3-east)      -- node {\midarrow} (dropout3-west);
+\draw [connection]  (dropout3-east) -- node {\midarrow} (output-west);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Layer Parameters - FIXED POSITIONING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Use absolute positioning with much lower y-coordinate to ensure text is below all elements
+\node[text width=5cm, align=center] at (7,-30) {\small ResNet18: 11.2M params};
+\node[text width=5cm, align=center] at (20,-30) {\small BiLSTM: 10.5M params};
+\node[text width=5cm, align=center] at (27,-30) {\small Attention: 263K params};
+\node[text width=6cm, align=center] at (37,-30) {\small Classifier: 665K params};
+
+% Add title at the top - moved to top center
+\node[align=center, font=\bfseries] at (22,15) {ArSLAttentionLSTM Architecture (22.6M parameters)};
+
+\end{tikzpicture}
+\end{document}
