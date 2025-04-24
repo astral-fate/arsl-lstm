@@ -40,3 +40,55 @@ results
 1. results of the cnn
 2. result of the lstm
 3. result of the Seq-LSTM
+
+```
+<root_directory_1>               <-- e.g., C:\Users\Fatima\Downloads\1\train
+|
+├── <class_id_1>                 <-- e.g., 0162 (formatted 4-digit string)
+|   |
+|   ├── <instance_folder_1>      <-- e.g., sequence_001, video_xyz (name doesn't matter)
+|   |   |
+|   |   ├── frame_0001.png       <-- Individual image frames of the sign
+|   |   ├── frame_0002.png
+|   |   ├── ...
+|   |   └── frame_NNNN.png
+|   |
+|   ├── <instance_folder_2>
+|   |   |
+|   |   ├── 0001.jpg
+|   |   ├── 0002.jpg
+|   |   └── ...
+|   └── ... (more instances of class_id_1)
+|
+├── <class_id_2>                 <-- e.g., 0165
+|   |
+|   ├── <instance_folder_A>
+|   |   |
+|   |   ├── image01.jpeg
+|   |   ├── image02.jpeg
+|   |   └── ...
+|   └── ... (more instances of class_id_2)
+|
+└── ... (more class folders specified in CLASSES_TO_INCLUDE)
+
+
+<root_directory_2>               <-- e.g., C:\Users\Fatima\Downloads\2\train
+|
+├── <class_id_1>                 <-- e.g., 0162 (Can have the same classes as root_1)
+|   |
+|   ├── <instance_folder_X>
+|   |   |
+|   |   └── ... (frame images)
+|   └── ...
+|
+├── <class_id_3>                 <-- e.g., 0174
+|   |
+|   └── ... (instances and frames)
+|
+└── ... (more class folders specified in CLASSES_TO_INCLUDE)
+
+... and similar structures for your TEST_DATA_ROOTS
+    e.g., C:\Users\Fatima\Downloads\1\test
+          C:\Users\Fatima\Downloads\2\test
+
+```
