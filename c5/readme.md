@@ -85,6 +85,8 @@ A detailed breakdown of performance per class is provided in the classification 
 The report confirms the excellent performance across almost all classes. Precision, Recall, and F1-scores are predominantly 1.00 or very close (>= 0.97). Minor deviations occur for 'sleep' (one instance missed, recall 0.97), 'silence' (one instance incorrectly predicted as 'silence', precision 0.97), 'worried' (one instance incorrectly predicted as 'worried', precision 0.97), and 'greeting' (one instance missed, recall 0.97). These minor errors have minimal impact on the high weighted average scores, reflecting the model's overall robustness for this 10-class task.
 
 ### Confusion Matrix Analysis
+![confusion_matrix_test](https://github.com/user-attachments/assets/2e03e8c9-0b63-4842-bdde-51513d6942a3)
+
 
 The confusion matrix (Figure Y - *referencing the plot generated*) provides a visual representation of class-wise predictions versus true labels. The matrix exhibits a strong diagonal concentration, indicating that the vast majority of test sequences were assigned to their correct class.
 
@@ -95,6 +97,7 @@ The off-diagonal entries highlight the specific misclassifications identified in
 These constitute the only errors made by the model on the 298 test samples. The lack of widespread confusion between classes suggests that the extracted keypoint features, combined with the T5 encoder's temporal modeling, effectively capture the unique motion patterns of each sign.
 
 ### Training Dynamics Analysis
+![training_history](https://github.com/user-attachments/assets/4a3cea13-356a-4c54-8961-7da96937d111)
 
 The training history plot (Figure Z - *referencing the plot generated*) illustrates the model's learning dynamics over the 64 epochs.
 
