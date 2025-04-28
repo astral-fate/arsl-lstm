@@ -1,0 +1,108 @@
+\documentclass[border=15pt, multi, tikz]{standalone}
+\usepackage{import}
+\usepackage{amsmath} % For math expressions like \times
+
+% Option 1: Use subimport if you have the layers/init.tex file
+% \subimport{./layers/}{init}
+
+% Option 2: Define necessary styles and colors directly if you don't have the file
+% Minimal definitions based on typical usage:
+\usepackage{tikz}
+\usetikzlibrary{positioning, 3d, shapes.misc, fit, arrows.meta}
+\tikzstyle{Box} = [rectangle, draw=black, thick, minimum width=2cm, minimum height=1cm, text centered, text width=2cm]
+\tikzstyle{RightBandedBox} = [rectangle, draw=black, thick, minimum width=2cm, minimum height=1cm, text centered, text width=2cm, path picture={
+    \fill[gray!30] (path picture bounding box.north east) -- (path picture bounding box.south east) -- ([xshift=-5pt]path picture bounding box.south east) -- ([xshift=-5pt]path picture bounding box.north east) -- cycle;
+}]
+\tikzstyle{connection} = [ultra thick, draw=black!70, -{Stealth[length=3mm]}] % Changed arrow style
+
+% Define Colors (adjust as needed)
+\def\InputColor{rgb:green,1;white,4}
+\def\EmbeddingColor{rgb:blue,1;white,4}
+\def\EncoderColor{rgb:blue,3;red,1;white,4}
+\def\CustomFeatColor{rgb:orange,2;white,4}
+\def\FusionColor{rgb:purple,2;white,4} % Color for conceptual fusion point
+\def\DropoutColor{rgb:gray,5;black,0.3}
+\def\LayerNormColor{rgb:green,2;black,0.3}
+\def\ActivationColor{rgb:yellow,2;white,4}
+\def\LinearColor{rgb:blue,2;white,4}
+\def\ClassifierColor{rgb:red,3;white,4}
+\def\OutputColor{rgb:red,5;white,4}
+
+\begin{document}
+\begin{tikzpicture}[node distance=1.5cm and 1cm] % Adjust node distance
+
+% Define Node Styles
+\tikzstyle{data}=[Box, fill=\InputColor, minimum height=2em, text width=2.5cm]
+\tikzstyle{embedding}=[Box, fill=\EmbeddingColor, minimum height=4em, text width=3cm]
+\tikzstyle{encoder}=[RightBandedBox, fill=\EncoderColor, minimum height=10em, text width=3cm, bandfill=\EncoderColor!70!black]
+\tikzstyle{custom}=[RightBandedBox, fill=\CustomFeatColor, minimum height=6em, text width=3cm, bandfill=\CustomFeatColor!70!black]
+\tikzstyle{process}=[Box, minimum height=3em, text width=2.5cm]
+\tikzstyle{classifier}=[Box, fill=\ClassifierColor, minimum height=3em, text width=2.5cm]
+\tikzstyle{output}=[Box, fill=\OutputColor, minimum height=2em, text width=2.5cm]
+\tikzstyle{dropout}=[Box, fill=\DropoutColor, minimum height=2em, text width=2.5cm, opacity=0.7]
+\tikzstyle{norm}=[Box, fill=\LayerNormColor, minimum height=2em, text width=2.5cm, opacity=0.7]
+\tikzstyle{act}=[Box, fill=\ActivationColor, minimum height=2em, text width=2.5cm, opacity=0.7]
+\tikzstyle{connector}=[coordinate] % Invisible node for complex connections
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Draw Layer Blocks
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Input Text Path
+\node (input_text) [data] {Input Text};
+\node (embedding) [embedding, right=of input_text] {Token Embedding \\ (Vocab: 32128 \\ Dim: 512)};
+\node (encoder) [encoder, right=of embedding] {T5 Encoder \\ (6 Blocks) \\ (Self-Attention + FF) \\ Dim: 512};
+\node (encoder_out) [process, fill=\EncoderColor!50, right=of encoder, text width=3cm] {Encoder Output \\ (e.g., First Token) \\ Dim: 512};
+
+% Custom Features Path (Place it below the main path for clarity)
+\node (input_custom) [data, below = 3cm of input_text] {Custom Features \\ (Dim: 42)};
+% Custom Linear Block decomposed
+\node (custom_linear) [process, fill=\LinearColor, right=2cm of input_custom] {Linear \\ (42 $\to$ 512)};
+\node (custom_dropout1) [dropout, right=0.5cm of custom_linear] {Dropout (p=0.1)};
+\node (custom_ln) [norm, right=0.5cm of custom_dropout1] {LayerNorm};
+\node (custom_gelu) [act, right=0.5cm of custom_ln] {GELU};
+% Group the custom MLP parts visually
+\node [draw, dashed, inner sep=5pt, fit=(custom_linear) (custom_gelu), label=below:Custom MLP] (custom_mlp_block) {};
+\node (custom_out) [connector, right=of custom_gelu] {}; % Connector for custom output
+
+% Fusion Point (Conceptual)
+\node (fusion) [connector, right=3cm of encoder_out] {};
+% Align custom_out horizontally with fusion
+\node (custom_out_aligned) [connector, at={(fusion|-custom_out)}] {};
+
+
+% Classifier Path
+\node (dropout_final) [dropout, right=of fusion] {Dropout (p=0.2)};
+\node (classifier) [classifier, right=of dropout_final] {Classifier (Linear) \\ (512 $\to$ 10)};
+\node (output) [output, right=of classifier] {Output Logits \\ (Dim: 10)};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Draw connections
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Text Path
+\draw [connection] (input_text) -- (embedding);
+\draw [connection] (embedding) -- (encoder);
+\draw [connection] (encoder) -- node[midway, above, sloped] {SeqLen $\times$ 512} (encoder_out);
+
+% Custom Path
+\draw [connection] (input_custom) -- (custom_linear);
+\draw [connection] (custom_linear) -- (custom_dropout1);
+\draw [connection] (custom_dropout1) -- (custom_ln);
+\draw [connection] (custom_ln) -- (custom_gelu);
+\draw [connection] (custom_gelu) -- (custom_out_aligned); % Connect GELU to the aligned connector
+
+% Fusion (Arrows converging on the final dropout)
+\draw [connection] (encoder_out) -- node[midway, above, sloped] {Dim: 512} (fusion);
+\draw [connection] (custom_out_aligned) -| node[midway, below, sloped] {Dim: 512} (fusion); % Use -| for right-angle turn
+
+% Classifier Path
+\draw [connection] (fusion) -- node[midway, above, sloped] {Combined 512} (dropout_final); % Label assumes combination preserves 512 dim
+\draw [connection] (dropout_final) -- (classifier);
+\draw [connection] (classifier) -- (output);
+
+% Add title
+\node[align=center, font=\bfseries] at (current bounding box.north) [yshift=1cm] {T5EncoderClassifier Architecture};
+
+\end{tikzpicture}
+\end{document}
