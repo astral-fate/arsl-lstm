@@ -92,3 +92,31 @@ results
           C:\Users\Fatima\Downloads\2\test
 
 ```
+
+
+
+```
+sign_language_app/
+├── model_weights/          # Store your .pth model files here
+│   ├── improved_arsl_model.pth   # Alphabet model
+│   └── sign_word_t5_classifier_best_3d.pth # Word model (or correct name)
+├── static/                   # Static files (CSS, JS - if needed later, favicon)
+│   └── favicon.ico           # (Optional)
+├── templates/                # HTML template
+│   └── index.html
+├── app.py                    # Main Flask application runner
+├── config.py                 # Configuration settings
+├── models/                   # Model definitions
+│   ├── __init__.py
+│   ├── alphabet_model.py
+│   └── word_model.py
+├── services/                 # Core prediction logic
+│   ├── __init__.py
+│   └── prediction_service.py
+├── utils/                    # Helper utilities
+│   ├── __init__.py
+│   ├── image_utils.py
+│   └── mediapipe_utils.py
+└── requirements.txt          # List of dependencies
+
+```
