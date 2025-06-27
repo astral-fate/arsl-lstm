@@ -543,6 +543,9 @@ This section presents the quantitative results obtained from model testing (accu
 
 This chapter documented the implementation journey of the ArSL translator system. It covered the environment setup, the tools employed, the extensive process of dataset aggregation and preparation, the development and training of two deep learning models, and the multi-faceted approach to testing. The detailed dataset statistics and splitting strategy were presented, laying the groundwork for the evaluation and discussion of results in the subsequent section.
 
+![c1a2e45f-0977-4c4c-bc3b-af35f30e13a1](https://github.com/user-attachments/assets/93cb2ddb-eaa2-46e7-a1c0-95bd5eb78b3c)
+![c3a9f631-2237-4be0-a879-e4b77fcff8fd](https://github.com/user-attachments/assets/10233a12-a7e4-450b-b069-51fd92ace2fd)
 
+![1cf65bc6-24e0-43b1-9c04-541ad364463c](https://github.com/user-attachments/assets/cf48b1be-c077-49a9-b9fe-cf754baab962)
 
 
